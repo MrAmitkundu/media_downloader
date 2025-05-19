@@ -64,7 +64,7 @@ def build_ydl_opts(format_str, postprocessors=None):
     return {
         'format': format_str,
         'outtmpl': os.path.join(BASE_DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-        'cookiefile': 'cookies.txt',  # ✅ Use your actual path here
+        'cookiefile': 'https://github.com/MrAmitkundu/media_downloader/blob/main/cookies.txt',  # ✅ Use your actual path here
         'quiet': True,
         'merge_output_format': 'mp4',
         'progress_hooks': [progress_hook],
