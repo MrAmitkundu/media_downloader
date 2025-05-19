@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>POIT Media Downloader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f7;
+      border-radius: 8px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px;
+      width: 100%;
+      font-size: 16px;
+      background-color: #0078d7;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: green;
+    }
+
+    #error {
+      margin-top: 20px;
+      font-weight: bold;
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>POIT Media Downloader</h1>
+
+  <label for="url">Video or Playlist URL:</label>
+  <input type="text" id="url" placeholder="Paste YouTube or Facebook URL here" />
+
+  <label for="media-type">Download type:</label>
+  <select id="media-type">
+    <option value="video">Video</option>
+    <option value="audio">Audio</option>
+  </select>
+
+  <label for="quality">Video Quality (only for video downloads):</label>
+  <input type="text" id="quality" placeholder="E.g. 4320, 2160, 1080, 720..." />
+
+  <button id="download-btn">Download</button>
+
+  <div id="status"></div>
+  <div id="error"></div>
+
+  <script>
+    const downloadBtn = document.getElementById('download-btn');
+    const statusDiv = document.getElementById('status');
+    const errorDiv = document.getElementById('error');
+
+    let progressInterval;
+
+    downloadBtn.addEventListener('click', async () => {
+      statusDiv.textContent = '';
+      errorDiv.textContent = '';
+
+      const url = document.getElementById('url').value.trim();
+      const mediaType = document.getElementById('media-type').value;
+      const quality = document.getElementById('quality').value.trim();
+
+      if (!url) {
+        errorDiv.textContent = 'Please enter a URL.';
+        return;
+      }
+      if (mediaType === 'video' && !quality) {
+        errorDiv.textContent = 'Please enter a video quality.';
+        return;
+      }
+
+      downloadBtn.disabled = true;
+      statusDiv.textContent = 'Starting download...';
+
+      progressInterval = setInterval(async () => {
+        const response = await fetch('http://127.0.0.1:5000/progress');
+        const progress = await response.json();
+        if (progress.status === 'downloading') {
+          statusDiv.textContent = `Downloading... ${progress.percent.toFixed(1)}%`;
+        } else if (progress.status === 'finished') {
+          statusDiv.textContent = `✅ Finished! Saved: ${progress.title}`;
+          clearInterval(progressInterval);
+        }
+      }, 1000);
+
+      try {
+        const response = await fetch('http://127.0.0.1:5000/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, type: mediaType, quality })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          errorDiv.textContent = `❌ Error: ${data.error || 'Unknown error'}`;
+          clearInterval(progressInterval);
+        }
+      } catch (err) {
+        errorDiv.textContent = '❌ Error: Could not connect to backend.';
+        clearInterval(progressInterval);
+      } finally {
+        downloadBtn.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+
+</html>
