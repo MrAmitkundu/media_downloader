@@ -13,6 +13,11 @@ progress_status = {'percent': 0, 'status': '', 'title': ''}
 def sanitize_filename(name):
     return re.sub(r'[\\/*?"<>|]', '', name)
 
+@app.route('/')
+def home():
+    return 'Media Downloader Backend is running.'
+
+
 @app.route('/ping')
 def ping():
     return 'pong'
