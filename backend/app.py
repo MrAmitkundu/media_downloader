@@ -59,14 +59,21 @@ def build_ydl_opts(format_str, postprocessors=None):
     return {
         'format': format_str,
         'outtmpl': os.path.join(BASE_DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-        'quiet': True,
+        'quiet': False,          # temporarily disable quiet mode for debugging
+        'verbose': True,         # enable verbose logging
         'merge_output_format': 'mp4',
         'progress_hooks': [progress_hook],
         'postprocessors': postprocessors or [],
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-        }
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Referer': 'https://www.youtube.com/',
+        },
+        'ratelimit': 500000,                # Limit download speed to 500 KB/s
+        'concurrent_fragment_downloads': 1 # Download fragments one at a time
     }
+
 
 def download_youtube(link, media_type, quality):
     global progress_status
