@@ -3,30 +3,9 @@ from flask_cors import CORS
 from yt_dlp import YoutubeDL
 import os
 import re
-from flask import Flask, send_from_directory, request, jsonify
-import os
 
-# Set the absolute path to the frontend directory
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend'))
-
-app = Flask(__name__, static_folder=frontend_dir, static_url_path='')
-
+app = Flask(__name__)
 CORS(app)
-
-# Serve index.html at the root URL
-@app.route('/')
-def serve_index():
-    return send_from_directory(frontend_dir, 'index.html')
-
-# Example backend API route
-@app.route('/api/download', methods=['POST'])
-def download():
-    data = request.json
-    url = data.get('url')
-    # Add your download logic here
-    return jsonify({"status": "success", "message": f"Downloaded: {url}"})
-
-
 
 BASE_DOWNLOAD_DIR = r'D:\YOUTUBE - FACEBOOK DOWNLOADS'
 progress_status = {'percent': 0, 'status': '', 'title': ''}
