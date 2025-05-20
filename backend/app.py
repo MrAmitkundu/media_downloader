@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from yt_dlp import YoutubeDL
 import os
@@ -7,7 +7,9 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-BASE_DOWNLOAD_DIR = r'D:\YOUTUBE - FACEBOOK DOWNLOADS'
+BASE_DOWNLOAD_DIR = 'downloads'  # use a relative folder (not system path like D:\) for portability
+os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
+
 progress_status = {'percent': 0, 'status': '', 'title': ''}
 
 def sanitize_filename(name):
@@ -16,7 +18,6 @@ def sanitize_filename(name):
 @app.route('/')
 def home():
     return 'Media Downloader Backend is running.'
-
 
 @app.route('/ping')
 def ping():
@@ -51,10 +52,18 @@ def download():
         progress_status = {'percent': 0, 'status': 'error', 'title': ''}
         return jsonify({'error': str(e)}), 500
 
+def strip_ansi(text):
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
+
 def progress_hook(d):
     if d['status'] == 'downloading':
-        percent = d.get('_percent_str', '0.0%').strip()
-        progress_status['percent'] = float(percent.replace('%', ''))
+        percent_str = d.get('_percent_str', '0.0%').strip()
+        percent_clean = strip_ansi(percent_str).replace('%', '')
+        try:
+            progress_status['percent'] = float(percent_clean)
+        except ValueError:
+            progress_status['percent'] = 0.0
         progress_status['status'] = 'downloading'
     elif d['status'] == 'finished':
         progress_status['percent'] = 100
@@ -64,7 +73,7 @@ def build_ydl_opts(format_str, postprocessors=None):
     return {
         'format': format_str,
         'outtmpl': os.path.join(BASE_DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-        'cookiefile': 'cookies.txt',  # path to your cookies file included in repo
+        'cookiefile': 'cookies.txt',  # must be Netscape format
         'nocheckcertificate': True,
         'quiet': True,
         'no_warnings': True,
@@ -75,8 +84,6 @@ def build_ydl_opts(format_str, postprocessors=None):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
         }
     }
-
-
 
 def download_youtube(link, media_type, quality):
     global progress_status
@@ -98,8 +105,15 @@ def download_youtube(link, media_type, quality):
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
         title = sanitize_filename(info.get('title', 'Downloaded'))
+        extension = 'mp3' if media_type == 'audio' else info.get('ext', 'mp4')
+        filename = f"{title}.{extension}"
+        filepath = os.path.join(BASE_DOWNLOAD_DIR, filename)
         progress_status['title'] = title
-        return jsonify({'status': 'success', 'title': title})
+
+        if os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True)
+        else:
+            return jsonify({'error': 'File not found after download'}), 500
 
 def download_facebook(link, quality):
     global progress_status
@@ -109,26 +123,15 @@ def download_facebook(link, quality):
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
         title = sanitize_filename(info.get('title', 'Downloaded'))
+        extension = info.get('ext', 'mp4')
+        filename = f"{title}.{extension}"
+        filepath = os.path.join(BASE_DOWNLOAD_DIR, filename)
         progress_status['title'] = title
-        return jsonify({'status': 'success', 'title': title})
 
-def strip_ansi(text):
-    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
-    return ansi_escape.sub('', text)
-
-def progress_hook(d):
-    if d['status'] == 'downloading':
-        percent_str = d.get('_percent_str', '0.0%').strip()
-        percent_clean = strip_ansi(percent_str).replace('%', '')
-        try:
-            progress_status['percent'] = float(percent_clean)
-        except ValueError:
-            progress_status['percent'] = 0.0
-        progress_status['status'] = 'downloading'
-    elif d['status'] == 'finished':
-        progress_status['percent'] = 100
-        progress_status['status'] = 'finished'
+        if os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True)
+        else:
+            return jsonify({'error': 'File not found after download'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-
