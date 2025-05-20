@@ -14,9 +14,10 @@ def download():
         return "No URL provided", 400
 
     output_filename = f"download_{uuid.uuid4()}.%(ext)s"
-    ydl_opts = {
+ydl_opts = {
         'outtmpl': output_filename,
-    }
+        'cookiefile': 'cookies.txt',  # <-- Add this line
+}
 
     if format_choice == 'audio':
         ydl_opts.update({
