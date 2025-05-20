@@ -64,8 +64,10 @@ def build_ydl_opts(format_str, postprocessors=None):
     return {
         'format': format_str,
         'outtmpl': os.path.join(BASE_DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-        'cookies': 'cookies.txt',  # ✅ Use your actual path here
+        'cookiefile': 'cookies.txt',  # path to your cookies file included in repo
+        'nocheckcertificate': True,
         'quiet': True,
+        'no_warnings': True,
         'merge_output_format': 'mp4',
         'progress_hooks': [progress_hook],
         'postprocessors': postprocessors or [],
