@@ -26,7 +26,7 @@ def download():
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'cookiefile': 'cookies.txt'  # Optional: only if you're using cookies
+            cookiefile': os.path.join(os.path.dirname(__file__), 'cookies.txt')  # Optional: only if you're using cookies
         })
     else:
         ydl_opts.update({
