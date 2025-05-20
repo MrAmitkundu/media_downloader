@@ -91,13 +91,17 @@ def download_youtube(link, media_type, quality):
     ydl_opts = {
         'format': format_str,
         'outtmpl': f'{temp_title}.%(ext)s',
-        'cookiefile': 'cookies.txt',
+        'cookiefile': 'cookies.txt',  # path to your cookies file included in repo
         'nocheckcertificate': True,
         'quiet': True,
         'no_warnings': True,
-        'merge_output_format': ext,
+        'merge_output_format': 'mp4',
         'progress_hooks': [progress_hook],
-        'postprocessors': postprocessors,
+        'postprocessors': postprocessors or [],
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        }
+
     }
 
     with YoutubeDL(ydl_opts) as ydl:
