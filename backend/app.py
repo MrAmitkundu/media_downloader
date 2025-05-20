@@ -11,7 +11,7 @@ CORS(app)
 progress_status = {'percent': 0, 'status': '', 'title': ''}
 
 def sanitize_filename(name):
-    return re.sub(r'[\\/*?"<>|]', '', name)
+    return re.sub(r'[\/*?"<>|]', '', name)
 
 @app.route('/')
 def home():
@@ -67,91 +67,102 @@ def progress_hook(d):
         progress_status['percent'] = 100
         progress_status['status'] = 'finished'
 
-def build_ydl_opts(format_str, title, ext, postprocessors=None):
-    return {
-        'format': format_str,
-        'outtmpl': f'{title}.%(ext)s',
-        'cookiefile': 'cookies.txt',
-        'nocheckcertificate': True,
-        'quiet': True,
-        'no_warnings': True,
-        'merge_output_format': 'mp4',
-        'progress_hooks': [progress_hook],
-        'postprocessors': postprocessors or [],
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-        }
-    }
-
 def download_youtube(link, media_type, quality):
     global progress_status
+
     if media_type == 'video':
         format_str = f"bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
         ext = 'mp4'
+        postprocessors = [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4'
+        }]
     else:
         format_str = 'bestaudio/best'
         ext = 'mp3'
-
-    postprocessors = []
-    if media_type == 'audio':
         postprocessors = [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }]
 
-    temp_title = "download_temp"
-    ydl_opts = build_ydl_opts(format_str, temp_title, ext, postprocessors)
+    output_buffer = io.BytesIO()
+    temp_title = "temp_download"
+    ydl_opts = {
+        'format': format_str,
+        'outtmpl': f'{temp_title}.%(ext)s',
+        'cookiefile': 'cookies.txt',
+        'nocheckcertificate': True,
+        'quiet': True,
+        'no_warnings': True,
+        'merge_output_format': ext,
+        'progress_hooks': [progress_hook],
+        'postprocessors': postprocessors,
+    }
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
         title = sanitize_filename(info.get('title', 'media'))
         filename = f"{temp_title}.{ext}"
-        final_filename = f"{title}.{ext}"
+        final_filename = f"{title}_POIT_{media_type}.{ext}"
 
     if os.path.exists(filename):
-        os.rename(filename, final_filename)
-        with open(final_filename, 'rb') as f:
-            file_data = f.read()
-        os.remove(final_filename)
-        buffer = io.BytesIO(file_data)
-        buffer.seek(0)
-        progress_status['title'] = title
+        with open(filename, 'rb') as f:
+            output_buffer.write(f.read())
+        os.remove(filename)
+        output_buffer.seek(0)
+
+        progress_status['title'] = final_filename
         return send_file(
-            buffer,
-            mimetype='application/octet-stream',
+            output_buffer,
             as_attachment=True,
-            download_name=final_filename
+            download_name=final_filename,
+            mimetype='application/octet-stream'
         )
     else:
-        return jsonify({'error': 'File not found after download'}), 500
+        return jsonify({'error': 'File not found after processing'}), 500
 
 def download_facebook(link, quality):
     global progress_status
+
     format_str = f"bestvideo[height={quality}]+bestaudio/best[height={quality}]/best"
     ext = 'mp4'
     temp_title = "fb_temp"
-    ydl_opts = build_ydl_opts(format_str, temp_title, ext)
+    output_buffer = io.BytesIO()
+
+    ydl_opts = {
+        'format': format_str,
+        'outtmpl': f'{temp_title}.%(ext)s',
+        'cookiefile': 'cookies.txt',
+        'nocheckcertificate': True,
+        'quiet': True,
+        'no_warnings': True,
+        'merge_output_format': 'mp4',
+        'progress_hooks': [progress_hook],
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4'
+        }],
+    }
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
         title = sanitize_filename(info.get('title', 'media'))
         filename = f"{temp_title}.{ext}"
-        final_filename = f"{title}.{ext}"
+        final_filename = f"{title}_POIT_video.{ext}"
 
     if os.path.exists(filename):
-        os.rename(filename, final_filename)
-        with open(final_filename, 'rb') as f:
-            file_data = f.read()
-        os.remove(final_filename)
-        buffer = io.BytesIO(file_data)
-        buffer.seek(0)
-        progress_status['title'] = title
+        with open(filename, 'rb') as f:
+            output_buffer.write(f.read())
+        os.remove(filename)
+        output_buffer.seek(0)
+
+        progress_status['title'] = final_filename
         return send_file(
-            buffer,
-            mimetype='application/octet-stream',
+            output_buffer,
             as_attachment=True,
-            download_name=final_filename
+            download_name=final_filename,
+            mimetype='application/octet-stream'
         )
     else:
         return jsonify({'error': 'File not found after download'}), 500
