@@ -3,12 +3,10 @@ from flask_cors import CORS
 from yt_dlp import YoutubeDL
 import os
 import re
+import io
 
 app = Flask(__name__)
 CORS(app)
-
-BASE_DOWNLOAD_DIR = 'downloads'  # use a relative folder (not system path like D:\) for portability
-os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
 
 progress_status = {'percent': 0, 'status': '', 'title': ''}
 
@@ -69,11 +67,11 @@ def progress_hook(d):
         progress_status['percent'] = 100
         progress_status['status'] = 'finished'
 
-def build_ydl_opts(format_str, postprocessors=None):
+def build_ydl_opts(format_str, title, ext, postprocessors=None):
     return {
         'format': format_str,
-        'outtmpl': os.path.join(BASE_DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-        'cookiefile': 'cookies.txt',  # must be Netscape format
+        'outtmpl': f'{title}.%(ext)s',
+        'cookiefile': 'cookies.txt',
         'nocheckcertificate': True,
         'quiet': True,
         'no_warnings': True,
@@ -89,8 +87,10 @@ def download_youtube(link, media_type, quality):
     global progress_status
     if media_type == 'video':
         format_str = f"bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        ext = 'mp4'
     else:
         format_str = 'bestaudio/best'
+        ext = 'mp3'
 
     postprocessors = []
     if media_type == 'audio':
@@ -100,38 +100,61 @@ def download_youtube(link, media_type, quality):
             'preferredquality': '192',
         }]
 
-    ydl_opts = build_ydl_opts(format_str, postprocessors)
+    temp_title = "download_temp"
+    ydl_opts = build_ydl_opts(format_str, temp_title, ext, postprocessors)
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
-        title = sanitize_filename(info.get('title', 'Downloaded'))
-        extension = 'mp3' if media_type == 'audio' else info.get('ext', 'mp4')
-        filename = f"{title}.{extension}"
-        filepath = os.path.join(BASE_DOWNLOAD_DIR, filename)
-        progress_status['title'] = title
+        title = sanitize_filename(info.get('title', 'media'))
+        filename = f"{temp_title}.{ext}"
+        final_filename = f"{title}.{ext}"
 
-        if os.path.exists(filepath):
-            return send_file(filepath, as_attachment=True)
-        else:
-            return jsonify({'error': 'File not found after download'}), 500
+    if os.path.exists(filename):
+        os.rename(filename, final_filename)
+        with open(final_filename, 'rb') as f:
+            file_data = f.read()
+        os.remove(final_filename)
+        buffer = io.BytesIO(file_data)
+        buffer.seek(0)
+        progress_status['title'] = title
+        return send_file(
+            buffer,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=final_filename
+        )
+    else:
+        return jsonify({'error': 'File not found after download'}), 500
 
 def download_facebook(link, quality):
     global progress_status
     format_str = f"bestvideo[height={quality}]+bestaudio/best[height={quality}]/best"
-    ydl_opts = build_ydl_opts(format_str)
+    ext = 'mp4'
+    temp_title = "fb_temp"
+    ydl_opts = build_ydl_opts(format_str, temp_title, ext)
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(link, download=True)
-        title = sanitize_filename(info.get('title', 'Downloaded'))
-        extension = info.get('ext', 'mp4')
-        filename = f"{title}.{extension}"
-        filepath = os.path.join(BASE_DOWNLOAD_DIR, filename)
-        progress_status['title'] = title
+        title = sanitize_filename(info.get('title', 'media'))
+        filename = f"{temp_title}.{ext}"
+        final_filename = f"{title}.{ext}"
 
-        if os.path.exists(filepath):
-            return send_file(filepath, as_attachment=True)
-        else:
-            return jsonify({'error': 'File not found after download'}), 500
+    if os.path.exists(filename):
+        os.rename(filename, final_filename)
+        with open(final_filename, 'rb') as f:
+            file_data = f.read()
+        os.remove(final_filename)
+        buffer = io.BytesIO(file_data)
+        buffer.seek(0)
+        progress_status['title'] = title
+        return send_file(
+            buffer,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=final_filename
+        )
+    else:
+        return jsonify({'error': 'File not found after download'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
